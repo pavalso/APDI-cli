@@ -1,15 +1,15 @@
-import io
 import os
 
 from requests_toolbelt.downloadutils import stream
 
 from src.exceptions import InvalidTokenError, UnknownError, BlobNotFoundError
+
 from ._api_requester import _ApiRequester
 
 
 class _Blob(_ApiRequester):
 
-    _endpoint_: str = "blobs"
+    _token_: str | None = None
 
     @property
     def md5(self) -> str:
@@ -18,6 +18,19 @@ class _Blob(_ApiRequester):
     @property
     def sha256(self) -> str:
         return self._hash("sha256")["sha256"]
+
+    @property
+    def exists(self) -> bool:
+        res = self._do_request(
+            "HEAD",
+            endpoint=f"{self._endpoint_}")
+
+        if res.status_code == 200:
+            return True
+        if res.status_code == 404:
+            return False
+
+        raise UnknownError(res.content)
 
     def __init__(self, id_: str) -> None:
         self.id_ = id_
@@ -54,35 +67,4 @@ class _Blob(_ApiRequester):
 
         raise UnknownError(res.content)
 
-class _UserBlob(_Blob):
-
-    def __init__(self, id_: str, user_token: str) -> None:
-        super().__init__(id_)
-        self._token_ = user_token
-
-    def upload(self, content: io.BufferedReader) -> None:
-        res = self._do_request(
-            "PUT",
-            endpoint=f"{self._endpoint_}",
-            data=content)
-
-        if res.status_code == 401:
-            raise InvalidTokenError
-        if res.status_code == 204:
-            return
-
-        raise UnknownError(res.content)
-
-    def delete(self) -> None:
-        res = self._do_request(
-            "DELETE",
-            endpoint=f"{self._endpoint_}")
-
-        if res.status_code == 401:
-            raise InvalidTokenError
-        if res.status_code == 204:
-            return
-
-        raise UnknownError(res.content)
-
-__export__ = {_Blob, _UserBlob}
+__export__ = {_Blob}

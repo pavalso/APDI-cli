@@ -4,9 +4,10 @@ import os
 from adiauthcli import Client
 
 from src.enums import Visibility
-from src.exceptions import InvalidTokenError, UnknownError, NotLoggedIn
+from src.exceptions import InvalidTokenError, UnknownError, NotLoggedIn, BlobNotFoundError
 from ._api_requester import _ApiRequester
-from .blob import _UserBlob
+from ._blob import _Blob
+from ._user_blob import _UserBlob
 
 
 _auth_url_ = os.getenv("AUTH_URL", "http://localhost:3001/")
@@ -24,7 +25,7 @@ class User(Client, _ApiRequester):
         if res.status_code == 200:
             return [
                 _UserBlob(blob_info["blobId"], self._token_)
-                for blob_info 
+                for blob_info
                 in res.json()["blobs"]]
 
         raise UnknownError(res.content)
@@ -58,3 +59,11 @@ class User(Client, _ApiRequester):
             return blob
 
         raise UnknownError(res.content)
+
+    def fetch_blob(self, id_: str) -> _Blob:
+        blob = _Blob(id_)
+
+        if not blob.exists:
+            raise BlobNotFoundError(id_)
+
+        return blob
