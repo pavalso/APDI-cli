@@ -2,9 +2,9 @@ import os
 
 from requests_toolbelt.downloadutils import stream
 
-from ._apiRequester import _ApiRequester
 from src.enums import Visibility
-from src.exceptions import BlobNotFoundError, NotLoggedIn, UnknownError
+from src.exceptions import InvalidBlob, BlobServiceError
+from ._apiRequester import _ApiRequester
 
 
 class Blob(_ApiRequester):
@@ -14,8 +14,36 @@ class Blob(_ApiRequester):
         return f"{self.serviceURL}/api/v1/blobs/{self.blobId}"
 
     @property
+    def endpoint(self) -> str:
+        return f"blobs/{self.blobId}"
+
+    @property
+    def allowedUsers(self) -> list[str]:
+        res = self._do_request(
+            "GET",
+            endpoint=f"{self.endpoint}/acl")
+
+        if res.status_code == 404:
+            raise InvalidBlob
+        if res.status_code == 200:
+            return res.json()["allowed_users"]
+        if res.status_code == 204:
+            return []
+
+        raise BlobServiceError
+
+    @property
     def isPrivate(self) -> bool:
-        return self._visibility == Visibility.PRIVATE
+        res = self._do_request(
+            "GET",
+            endpoint=f"{self.endpoint}/visibility")
+
+        if res.status_code == 404:
+            raise InvalidBlob
+        if res.status_code == 200:
+            return res.json()["visibility"] == Visibility.PRIVATE.value
+
+        raise BlobServiceError
 
     @property
     def md5(self) -> str:
@@ -28,8 +56,6 @@ class Blob(_ApiRequester):
     def __init__(self, blobId: str, authToken: str = None):
         super().__init__(authToken)
         self.blobId = blobId
-        self._visibility = Visibility.PRIVATE
-        self.allowedUsers = []
 
     def _hash(self, *types) -> dict[str, str]:
         if not types:
@@ -37,26 +63,23 @@ class Blob(_ApiRequester):
 
         res = self._do_request(
             "GET",
-            endpoint=f"blobs/{self.blobId}/hash",
+            endpoint=f"{self.endpoint}/hash",
             params={
                 "type": ",".join(types)
             }
         )
 
         if res.status_code == 404:
-            raise BlobNotFoundError(self.blobId)
+            raise InvalidBlob
         if res.status_code == 200:
             return res.json()
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def allowUser(self, username: str) -> None:
-        if not self.authToken:
-            raise NotLoggedIn
-
         res = self._do_request(
             "PATCH",
-            endpoint=f"blobs/{self.blobId}/acl",
+            endpoint=f"{self.endpoint}/acl",
             json={
                 "acl": [
                     username
@@ -64,89 +87,77 @@ class Blob(_ApiRequester):
             })
 
         if res.status_code == 404:
-            raise BlobNotFoundError(self.blobId)
+            raise InvalidBlob
         if res.status_code == 204:
             return
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def delete(self) -> None:
-        if not self.authToken:
-            raise NotLoggedIn
-
         res = self._do_request(
             "DELETE",
-            endpoint=f"blobs/{self.blobId}")
+            endpoint=self.endpoint)
 
         if res.status_code == 404:
-            raise BlobNotFoundError(self.blobId)
+            raise InvalidBlob
         if res.status_code == 204:
             return
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def dumpToFile(self, localFilename: str | os.PathLike = None) -> None:
         res = self._do_request(
             "GET",
-            endpoint=f"blobs/{self.blobId}",
+            endpoint=self.endpoint,
             stream=True)
 
         if res.status_code == 404:
-            raise BlobNotFoundError(self.blobId)
+            raise InvalidBlob
         if res.status_code == 200:
             filename = localFilename if localFilename is not None else self.blobId
             with open(filename, "wb") as f:
                 stream.stream_response_to_file(res, f, chunksize = 1024 * 1024)
             return
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def revokeUser(self, username: str) -> None:
-        if not self.authToken:
-            raise NotLoggedIn
-
         res = self._do_request(
             "DELETE",
-            endpoint=f"blobs/{self.blobId}/acl/{username}")
+            endpoint=f"{self.endpoint}/acl/{username}")
 
         if res.status_code == 404:
-            raise BlobNotFoundError(self.blobId)
+            raise InvalidBlob
         if res.status_code == 204:
             return
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def setVisibility(self, private: bool) -> None:
-        if not self.authToken:
-            raise NotLoggedIn
-
         res = self._do_request(
             "PUT",
-            endpoint=f"blobs/{self.blobId}/visibility",
+            endpoint=f"{self.endpoint}/visibility",
             json={
                 "visibility": Visibility.PRIVATE.value if private else Visibility.PUBLIC.value
             })
 
         if res.status_code == 404:
-            raise BlobNotFoundError(self.blobId)
+            raise InvalidBlob
         if res.status_code == 204:
             return
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def uploadFromFile(self, localFilename: str | os.PathLike) -> None:
-        if not self.authToken:
-            raise NotLoggedIn
-
         with open(localFilename, "rb") as f:
             res = self._do_request(
                 "PUT",
-                endpoint=f"blobs/{self.blobId}",
+                endpoint=self.endpoint,
                 data=f)
 
         if res.status_code == 404:
-            raise BlobNotFoundError(self.blobId)
+            raise InvalidBlob
         if res.status_code == 204:
             return
 
-        raise UnknownError(res.content)
+        raise BlobServiceError

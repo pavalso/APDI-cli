@@ -1,7 +1,7 @@
 import os
 
 from src.enums import Visibility
-from src.exceptions import BlobNotFoundError, InvalidTokenError, UnknownError, NotLoggedIn
+from src.exceptions import InvalidBlob, Unauthorized, BlobServiceError
 from .blob import Blob
 from ._apiRequester import _ApiRequester
 
@@ -12,9 +12,6 @@ class BlobService(_ApiRequester):
         super().__init__(authToken, serviceURL)
 
     def createBlob(self, localFilename: str | os.PathLike) -> Blob:
-        if self.authToken is None:
-            raise NotLoggedIn
-
         res = self._do_request(
             "POST",
             endpoint="blobs",
@@ -24,7 +21,7 @@ class BlobService(_ApiRequester):
         )
 
         if res.status_code == 401:
-            raise InvalidTokenError
+            raise Unauthorized
         if res.status_code == 201:
             blob = Blob(res.json()["blobId"], self.authToken)
 
@@ -32,23 +29,20 @@ class BlobService(_ApiRequester):
 
             return blob
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def deleteBlob(self, blob: str | Blob) -> None:
-        if self.authToken is None:
-            raise NotLoggedIn
-
         res = self._do_request(
             "DELETE",
             endpoint=f"blobs/{blob.blobId}"
         )
 
         if res.status_code == 404:
-            raise BlobNotFoundError(blob.blobId)
+            raise InvalidBlob
         if res.status_code == 204:
             return
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def getBlob(self, blobId: str) -> Blob:
         res = self._do_request(
@@ -57,24 +51,21 @@ class BlobService(_ApiRequester):
         )
 
         if res.status_code == 404:
-            raise BlobNotFoundError(blobId)
+            raise InvalidBlob
         if res.status_code == 200:
             blob = Blob(blobId, self.authToken)
             return blob
 
-        raise UnknownError(res.content)
+        raise BlobServiceError
 
     def getBlobs(self) -> list[str]:
-        if self.authToken is None:
-            raise NotLoggedIn
-
         res = self._do_request(
             "GET",
             endpoint="blobs/"
         )
 
         if res.status_code == 401:
-            raise InvalidTokenError
+            raise Unauthorized
         if res.status_code == 200:
             return [
                 blob_info["blobId"]
@@ -82,4 +73,4 @@ class BlobService(_ApiRequester):
                 in res.json()["blobs"]
                 ]
 
-        raise UnknownError(res.content)
+        raise BlobServiceError

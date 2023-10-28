@@ -1,10 +1,24 @@
 import os
+import sys
+
+from urllib.error import URLError
+from urllib.parse import urlparse
+from argparse import ArgumentParser
+
 import cmd2
 
 from adiauthcli import Client
 from src import BlobService, Visibility
 from src import exceptions
 
+
+__usage__ = f"Usage: python \"{__file__}\" [auth_api] [blobs_api]"
+
+def _url(url: str) -> str:
+    result = urlparse(url)
+    if all([result.scheme, result.netloc]):
+        return url
+    raise URLError
 
 login_parser = cmd2.Cmd2ArgumentParser()
 login_parser.add_argument(
@@ -49,13 +63,22 @@ visibility_parser.add_argument(
     type=str,
     choices=list(Visibility))
 
+property_parser = cmd2.Cmd2ArgumentParser()
+property_parser.add_argument(
+    "blob_id",
+    type=str)
+property_parser.add_argument(
+    "property",
+    type=str,
+    choices=["accessURL", "allowedUsers", "isPrivate"])
+
 class APDICli(cmd2.Cmd):
 
     def __init__(self) -> None:
         super().__init__()
 
-        self.blobsURL = os.getenv("BLOBS_URL", "http://localhost:3002")
-        self.usersURL = os.getenv("USERS_URL", "http://localhost:3001")
+        self.blobsURL = os.getenv("BLOBS_URL")
+        self.usersURL = os.getenv("AUTH_URL")
 
         self.user = Client(self.usersURL)
         self.blobService = BlobService(self.blobsURL)
@@ -111,7 +134,12 @@ class APDICli(cmd2.Cmd):
         blob_id, file = args.blob_id, args.file
 
         blob = self.blobService.getBlob(blob_id)
-        blob.uploadFromFile(file)
+
+        try:
+            blob.uploadFromFile(file)
+        except FileNotFoundError:
+            self.perror(f'File "{file}" not found')
+            return
 
         self.pfeedback(f'Uploaded "{file}" to blob {blob_id}')
 
@@ -170,23 +198,55 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback(f'Deleted blob {blob_id}')
 
+    @cmd2.with_argparser(property_parser)
+    def do_property(self, args) -> None:
+        blob_id, property_ = args.blob_id, args.property
+
+        blob = self.blobService.getBlob(blob_id)
+
+        value = getattr(blob, property_)
+
+        self.pfeedback(value)
+
     def onecmd(self, statement: str, *args, **kwargs) -> bool:
         try:
             return super().onecmd(statement, *args, **kwargs)
-        except exceptions.BlobNotFoundError as bnf:
-            self.perror(f"Blob not found: {bnf}")
-        except exceptions.InvalidTokenError:
+        except exceptions.InvalidBlob:
+            self.perror("Blob not found")
+        except exceptions.Unauthorized:
             self.perror("Session expired. login again")
             self.user.logout()
-        except exceptions.NotLoggedIn:
-            self.perror("You are not logged in")
         return False
 
     def update_prompt(self) -> None:
         username = self.user._user_ if self.user._user_ is not None else "anon"
         self.prompt = f"APDI@{username}:$ "
 
+def _parse_args() -> ArgumentParser:
+    parser = ArgumentParser()
+    parser.add_argument(
+        "auth_api",
+        type=_url)
+
+    parser.add_argument(
+        "blobs_api",
+        type=_url)
+
+    return parser.parse_args()
+
 if __name__ == "__main__":
+    try:
+        args_ = _parse_args()
+    except URLError:
+        print(f"[!] Invalid URL.\n{__usage__}")
+        sys.exit(1)
+
+    _argv = [sys.argv[0]]
+    sys.argv = _argv
+
+    os.environ["AUTH_URL"] = args_.auth_api
+    os.environ["BLOBS_URL"] = args_.blobs_api
+
     APDICli().cmdloop(r"""
   ____  ____  ___    ____        ____   _       ___   ____    _____
  /    ||    \|   \  |    |      |    \ | |     /   \ |    \  / ___/
