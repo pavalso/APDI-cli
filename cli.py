@@ -6,50 +6,48 @@ from src import BlobService, Visibility
 from src import exceptions
 
 
-class _Parsers:
+login_parser = cmd2.Cmd2ArgumentParser()
+login_parser.add_argument(
+    "user",
+    type=str)
+login_parser.add_argument(
+    "password",
+    type=str)
 
-    login_parser = cmd2.Cmd2ArgumentParser()
-    login_parser.add_argument(
-        "user",
-        type=str)
-    login_parser.add_argument(
-        "password",
-        type=str)
+new_parser = cmd2.Cmd2ArgumentParser()
+new_parser.add_argument(
+    "file",
+    type=str)
 
-    new_parser = cmd2.Cmd2ArgumentParser()
-    new_parser.add_argument(
-        "file",
-        type=str)
+upload_parser = cmd2.Cmd2ArgumentParser()
+upload_parser.add_argument(
+    "blob_id",
+    type=str)
+upload_parser.add_argument(
+    "file",
+    type=str)
 
-    upload_parser = cmd2.Cmd2ArgumentParser()
-    upload_parser.add_argument(
-        "blob_id",
-        type=str)
-    upload_parser.add_argument(
-        "file",
-        type=str)
+needid_parser = cmd2.Cmd2ArgumentParser()
+needid_parser.add_argument(
+    "blob_id",
+    type=str)
 
-    needid_parser = cmd2.Cmd2ArgumentParser()
-    needid_parser.add_argument(
-        "blob_id",
-        type=str)
+username_blobid_parser = cmd2.Cmd2ArgumentParser()
+username_blobid_parser.add_argument(
+    "username",
+    type=str)
+username_blobid_parser.add_argument(
+    "blob_id",
+    type=str)
 
-    username_blobid_parser = cmd2.Cmd2ArgumentParser()
-    username_blobid_parser.add_argument(
-        "username",
-        type=str)
-    username_blobid_parser.add_argument(
-        "blob_id",
-        type=str)
-
-    visibility_parser = cmd2.Cmd2ArgumentParser()
-    visibility_parser.add_argument(
-        "blob_id",
-        type=str)
-    visibility_parser.add_argument(
-        "visibility",
-        type=str,
-        choices=list(Visibility))
+visibility_parser = cmd2.Cmd2ArgumentParser()
+visibility_parser.add_argument(
+    "blob_id",
+    type=str)
+visibility_parser.add_argument(
+    "visibility",
+    type=str,
+    choices=list(Visibility))
 
 class APDICli(cmd2.Cmd):
 
@@ -67,7 +65,7 @@ class APDICli(cmd2.Cmd):
     def do_exit(self, _) -> bool:
         return True
 
-    @cmd2.with_argparser(_Parsers.login_parser)
+    @cmd2.with_argparser(login_parser)
     def do_login(self, args) -> None:
         user, password = args.user, args.password
 
@@ -78,7 +76,7 @@ class APDICli(cmd2.Cmd):
 
         self.update_prompt()
 
-    @cmd2.with_argparser(_Parsers.new_parser)
+    @cmd2.with_argparser(new_parser)
     def do_new(self, args) -> None:
         file = args.file
 
@@ -99,7 +97,7 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback("\n".join([f"{i}. {blob_id}" for i, blob_id in enumerate(blobs, start=1)]))
 
-    @cmd2.with_argparser(_Parsers.needid_parser)
+    @cmd2.with_argparser(needid_parser)
     def do_download(self, args) -> None:
         blob_id = args.blob_id
 
@@ -108,7 +106,7 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback(f'Downloaded blob to "{blob_id}.download"')
 
-    @cmd2.with_argparser(_Parsers.upload_parser)
+    @cmd2.with_argparser(upload_parser)
     def do_upload(self, args) -> None:
         blob_id, file = args.blob_id, args.file
 
@@ -117,7 +115,7 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback(f'Uploaded "{file}" to blob {blob_id}')
 
-    @cmd2.with_argparser(_Parsers.needid_parser)
+    @cmd2.with_argparser(needid_parser)
     def do_md5(self, args) -> None:
         blob_id = args.blob_id
 
@@ -125,7 +123,7 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback(blob.md5)
 
-    @cmd2.with_argparser(_Parsers.needid_parser)
+    @cmd2.with_argparser(needid_parser)
     def do_sha256(self, args) -> None:
         blob_id = args.blob_id
 
@@ -133,7 +131,7 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback(blob.sha256)
 
-    @cmd2.with_argparser(_Parsers.visibility_parser)
+    @cmd2.with_argparser(visibility_parser)
     def do_visibility(self, arg) -> None:
         blob_id, visibility = arg.blob_id, arg.visibility
 
@@ -145,7 +143,7 @@ class APDICli(cmd2.Cmd):
         self.pfeedback(
             f'Visibility of blob {blob_id} set to {"private" if isPrivate else "public"}')
 
-    @cmd2.with_argparser(_Parsers.username_blobid_parser)
+    @cmd2.with_argparser(username_blobid_parser)
     def do_allow(self, arg) -> None:
         username, blob_id = arg.username, arg.blob_id
 
@@ -154,7 +152,7 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback(f'User {username} can now access blob {blob_id}')
 
-    @cmd2.with_argparser(_Parsers.username_blobid_parser)
+    @cmd2.with_argparser(username_blobid_parser)
     def do_revoke(self, args) -> None:
         username, blob_id = args.username, args.blob_id
 
@@ -163,7 +161,7 @@ class APDICli(cmd2.Cmd):
 
         self.pfeedback(f'User {username} can no longer access blob {blob_id}')
 
-    @cmd2.with_argparser(_Parsers.needid_parser)
+    @cmd2.with_argparser(needid_parser)
     def do_delete(self, args) -> None:
         blob_id = args.blob_id
 
