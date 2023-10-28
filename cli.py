@@ -1,57 +1,191 @@
+import os
 import cmd2
 
-from src import User
-from src import Visibility
+from adiauthcli import Client
+from src import BlobService, Visibility
+from src import exceptions
 
+
+class _Parsers:
+
+    login_parser = cmd2.Cmd2ArgumentParser()
+    login_parser.add_argument(
+        "user",
+        type=str)
+    login_parser.add_argument(
+        "password",
+        type=str)
+
+    new_parser = cmd2.Cmd2ArgumentParser()
+    new_parser.add_argument(
+        "file",
+        type=str)
+
+    upload_parser = cmd2.Cmd2ArgumentParser()
+    upload_parser.add_argument(
+        "blob_id",
+        type=str)
+    upload_parser.add_argument(
+        "file",
+        type=str)
+
+    needid_parser = cmd2.Cmd2ArgumentParser()
+    needid_parser.add_argument(
+        "blob_id",
+        type=str)
+
+    username_blobid_parser = cmd2.Cmd2ArgumentParser()
+    username_blobid_parser.add_argument(
+        "username",
+        type=str)
+    username_blobid_parser.add_argument(
+        "blob_id",
+        type=str)
+
+    visibility_parser = cmd2.Cmd2ArgumentParser()
+    visibility_parser.add_argument(
+        "blob_id",
+        type=str)
+    visibility_parser.add_argument(
+        "visibility",
+        type=str,
+        choices=list(Visibility))
 
 class APDICli(cmd2.Cmd):
 
     def __init__(self) -> None:
         super().__init__()
-        self.user = User()
+
+        self.blobsURL = os.getenv("BLOBS_URL", "http://localhost:3002")
+        self.usersURL = os.getenv("USERS_URL", "http://localhost:3001")
+
+        self.user = Client(self.usersURL)
+        self.blobService = BlobService(self.blobsURL)
+
         self.update_prompt()
 
     def do_exit(self, _) -> bool:
         return True
 
-    def do_login(self, arg) -> None:
-        self.user.login("test", "test")
+    @cmd2.with_argparser(_Parsers.login_parser)
+    def do_login(self, args) -> None:
+        user, password = args.user, args.password
+
+        self.user.login(user, password)
+        self.blobService = BlobService(self.blobsURL, self.user.auth_token)
+
+        self.pfeedback(f"Logged in as {user}")
+
         self.update_prompt()
+
+    @cmd2.with_argparser(_Parsers.new_parser)
+    def do_new(self, args) -> None:
+        file = args.file
+
+        blob = self.blobService.createBlob(file)
+
+        self.pfeedback(f"Created new blob with id: {blob.blobId}")
 
     def do_logout(self, _) -> None:
         self.user.logout()
-        self.user = User()
+        self.blobService = BlobService(self.blobsURL)
+
+        self.pfeedback("Logged out")
+
         self.update_prompt()
 
     def do_blobs(self, _) -> None:
-        blobs = self.user.blobs
-        self.poutput("\n".join([f"{i}. {blob_id}" for i, blob_id in enumerate(blobs, start=1)]))
+        blobs = self.blobService.getBlobs()
 
-    def do_download(self, arg) -> None:
-        download_path = self.user.download(arg, f"{arg}.download")
-        self.poutput(f'Downloaded blob to "{download_path}"')
+        self.pfeedback("\n".join([f"{i}. {blob_id}" for i, blob_id in enumerate(blobs, start=1)]))
 
-    def do_upload(self, arg) -> None:
-        blob_id, file = arg.split(" ")
-        with open(file, "rb") as f:
-            self.user.upload(blob_id, f)
+    @cmd2.with_argparser(_Parsers.needid_parser)
+    def do_download(self, args) -> None:
+        blob_id = args.blob_id
 
-    def do_hash(self, arg) -> None:
-        blob_id, *types = arg.split(" ")
-        buf = '\n'.join([f'{_type}: "{hash}"' for _type, hash in self.user.hash(blob_id, *types).items()])
-        self.poutput(buf)
+        blob = self.blobService.getBlob(blob_id)
+        blob.dumpToFile(f"{blob_id}.download")
 
-    def do_delete(self, arg) -> None:
-        self.user.delete(arg)
+        self.pfeedback(f'Downloaded blob to "{blob_id}.download"')
 
-    def do_new(self, arg) -> None:
-        visibility, file = arg.split(" ")
-        with open(file, "rb") as f:
-            blob_id = self.user.new_blob(visibility=Visibility(visibility), content=f)
-        self.poutput(f"Created new blob with id: {blob_id}")
+    @cmd2.with_argparser(_Parsers.upload_parser)
+    def do_upload(self, args) -> None:
+        blob_id, file = args.blob_id, args.file
+
+        blob = self.blobService.getBlob(blob_id)
+        blob.uploadFromFile(file)
+
+        self.pfeedback(f'Uploaded "{file}" to blob {blob_id}')
+
+    @cmd2.with_argparser(_Parsers.needid_parser)
+    def do_md5(self, args) -> None:
+        blob_id = args.blob_id
+
+        blob = self.blobService.getBlob(blob_id)
+
+        self.pfeedback(blob.md5)
+
+    @cmd2.with_argparser(_Parsers.needid_parser)
+    def do_sha256(self, args) -> None:
+        blob_id = args.blob_id
+
+        blob = self.blobService.getBlob(blob_id)
+
+        self.pfeedback(blob.sha256)
+
+    @cmd2.with_argparser(_Parsers.visibility_parser)
+    def do_visibility(self, arg) -> None:
+        blob_id, visibility = arg.blob_id, arg.visibility
+
+        blob = self.blobService.getBlob(blob_id)
+
+        isPrivate = visibility == Visibility.PRIVATE.value
+        blob.setVisibility(isPrivate)
+
+        self.pfeedback(
+            f'Visibility of blob {blob_id} set to {"private" if isPrivate else "public"}')
+
+    @cmd2.with_argparser(_Parsers.username_blobid_parser)
+    def do_allow(self, arg) -> None:
+        username, blob_id = arg.username, arg.blob_id
+
+        blob = self.blobService.getBlob(blob_id)
+        blob.allowUser(username)
+
+        self.pfeedback(f'User {username} can now access blob {blob_id}')
+
+    @cmd2.with_argparser(_Parsers.username_blobid_parser)
+    def do_revoke(self, args) -> None:
+        username, blob_id = args.username, args.blob_id
+
+        blob = self.blobService.getBlob(blob_id)
+        blob.revokeUser(username)
+
+        self.pfeedback(f'User {username} can no longer access blob {blob_id}')
+
+    @cmd2.with_argparser(_Parsers.needid_parser)
+    def do_delete(self, args) -> None:
+        blob_id = args.blob_id
+
+        blob = self.blobService.getBlob(blob_id)
+        blob.delete()
+
+        self.pfeedback(f'Deleted blob {blob_id}')
+
+    def onecmd(self, statement: str, *args, **kwargs) -> bool:
+        try:
+            return super().onecmd(statement, *args, **kwargs)
+        except exceptions.BlobNotFoundError as bnf:
+            self.perror(f"Blob not found: {bnf}")
+        except exceptions.InvalidTokenError:
+            self.perror("Session expired. login again")
+            self.user.logout()
+        except exceptions.NotLoggedIn:
+            self.perror("You are not logged in")
+        return False
 
     def update_prompt(self) -> None:
-        username = self.user.username if self.user.username is not None else "anon"
+        username = self.user._user_ if self.user._user_ is not None else "anon"
         self.prompt = f"APDI@{username}:$ "
 
 if __name__ == "__main__":
