@@ -1,2 +1,4 @@
 .env/
 __pycache__/
+build
+apdi_blobs_cli.egg-info/

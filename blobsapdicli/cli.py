@@ -8,8 +8,9 @@ from argparse import ArgumentParser
 import cmd2
 
 from adiauthcli import Client
-from src import BlobService, Visibility
-from src import exceptions
+
+from blobsapdicli import BlobService, Visibility
+from blobsapdicli import exceptions
 
 
 __usage__ = f"Usage: python \"{__file__}\" [auth_api] [blobs_api]"
@@ -234,7 +235,7 @@ def _parse_args() -> ArgumentParser:
 
     return parser.parse_args()
 
-if __name__ == "__main__":
+def main():
     try:
         args_ = _parse_args()
     except URLError:
@@ -257,3 +258,6 @@ if __name__ == "__main__":
 |__|__||__|  |_____||____|      |_____||_____| \___/ |_____|  \___|
                                                                    
 """)
+
+if __name__ == "__main__":
+    main()

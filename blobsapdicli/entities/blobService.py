@@ -1,9 +1,9 @@
 import os
 
-from src.enums import Visibility
-from src.exceptions import InvalidBlob, Unauthorized, BlobServiceError
-from .blob import Blob
-from ._apiRequester import _ApiRequester
+from blobsapdicli.enums import Visibility
+from blobsapdicli.exceptions import InvalidBlob, Unauthorized, BlobServiceError
+from blobsapdicli.entities.blob import Blob
+from blobsapdicli.entities._apiRequester import _ApiRequester
 
 
 class BlobService(_ApiRequester):

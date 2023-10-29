@@ -2,9 +2,9 @@ import os
 
 from requests_toolbelt.downloadutils import stream
 
-from src.enums import Visibility
-from src.exceptions import InvalidBlob, BlobServiceError
-from ._apiRequester import _ApiRequester
+from blobsapdicli.enums import Visibility
+from blobsapdicli.exceptions import InvalidBlob, BlobServiceError
+from blobsapdicli.entities._apiRequester import _ApiRequester
 
 
 class Blob(_ApiRequester):
