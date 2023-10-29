@@ -31,7 +31,7 @@ class BlobService(_ApiRequester):
 
         raise BlobServiceError
 
-    def deleteBlob(self, blob: str | Blob) -> None:
+    def deleteBlob(self, blob: Blob) -> None:
         res = self._do_request(
             "DELETE",
             endpoint=f"blobs/{blob.blobId}"
