@@ -8,7 +8,7 @@ setup(
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'blobs-cli = blobsapdicli.cli:main'
+            'blobs_cli = blobsapdicli.cli:main'
         ]
     }
 )
