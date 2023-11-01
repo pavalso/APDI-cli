@@ -93,7 +93,12 @@ class APDICli(cmd2.Cmd):
     def do_login(self, args) -> None:
         user, password = args.user, args.password
 
-        self.user.login(user, password)
+        try:
+            self.user.login(user, password)
+        except exceptions.adiauth.Unauthorized:
+            self.perror("Invalid credentials")
+            return
+
         self.blobService = BlobService(self.blobsURL, self.user.auth_token)
 
         self.pfeedback(f"Logged in as {user}")
