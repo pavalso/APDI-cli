@@ -12,6 +12,10 @@ Cliente básico para el servicio [APDI-BLOBS](https://github.com/pavalso/APDI)
 
 4- Ejecutar el cliente con ```blobs_cli <url_servicio_autenticación> <url_servicio_blobs>```
 
+### Ejecutar pruebas
+
+Probar clases de negocio: ```coverage run --omit="blobsapdi/cli.py" -m unittest discover tests/ && coverage report --fail-under=80```
+
 # Manual de Instrucciones
 
 ## Comandos Disponibles
