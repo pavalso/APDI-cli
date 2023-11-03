@@ -4,6 +4,7 @@ import sys
 from urllib.error import URLError
 from urllib.parse import urlparse
 from argparse import ArgumentParser
+from requests import exceptions as requests_exceptions
 
 import cmd2
 
@@ -222,6 +223,10 @@ class APDICli(cmd2.Cmd):
         except exceptions.Unauthorized:
             self.perror("Session expired. login again")
             self.user.logout()
+        except requests_exceptions.ReadTimeout:
+            self.perror("Connection timed out")
+        except requests_exceptions.ConnectionError:
+            self.perror("Connection error")
         return False
 
     def update_prompt(self) -> None:
